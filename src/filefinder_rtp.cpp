@@ -128,13 +128,15 @@ FileFinder_RTP::FileFinder_RTP(bool no_rtp, bool no_rtp_warnings, std::string rt
 
 	// Windows paths are split by semicolon, Unix paths by colon
 	std::function<bool(char32_t)> f = [](char32_t t) {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 		return t == ';';
 #else
 		return t == ':' || t == ';';
 #endif
 	};
 
+	// Don't try so hard if we specified it ourselves
+	#if !defined(ES_ADD_RTP_PATHS)
 	if (Player::IsRPG2k() && getenv("RPG2K_RTP_PATH"))
 		env_paths = Utils::Tokenize(getenv("RPG2K_RTP_PATH"), f);
 	else if (Player::IsRPG2k3() && getenv("RPG2K3_RTP_PATH"))
@@ -144,6 +146,7 @@ FileFinder_RTP::FileFinder_RTP(bool no_rtp, bool no_rtp_warnings, std::string rt
 		std::vector<std::string> tmp = Utils::Tokenize(getenv("RPG_RTP_PATH"), f);
 		env_paths.insert(env_paths.end(), tmp.begin(), tmp.end());
 	}
+	#endif
 
 	// If custom RTP paths are set, use these with highest precedence
 	if (!rtp_path.empty()) {

@@ -241,6 +241,8 @@ void Output::ToggleLog() {
 
 void Output::ErrorStr(std::string const& err) {
 	WriteLog(LogLevel::Error, err);
+
+	#ifndef EP_WRITELOG_ERROR_ABORTS
 	std::string error = "Error:\n" + err + "\n\nEasyRPG Player will close now.";
 
 	static bool recursive_call = false;
@@ -267,6 +269,7 @@ void Output::ErrorStr(std::string const& err) {
 	}
 
 	Player::exit_code = EXIT_FAILURE;
+	#endif
 
 	// FIXME: No idea how to indicate error from core in libretro
 	exit(Player::exit_code);

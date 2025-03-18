@@ -85,10 +85,12 @@ namespace Main_Data {
 void Main_Data::Init() {
 	if (project_path.empty()) {
 		// First use environment variables
+		#ifndef ES_NO_GETENV
 		project_path =
 			getenv("RPG_TEST_GAME_PATH") ? getenv("RPG_TEST_GAME_PATH") :
 			getenv("RPG_GAME_PATH") ? getenv("RPG_GAME_PATH") :
 			"";
+		#endif
 
 		if (project_path.empty()) {
 			// Set to current directory

@@ -19,7 +19,7 @@
 #  include <windows.h>
 #endif
 
-#if defined(_WIN32) && !defined(_ARM_)
+#if defined(_WIN32) && !defined(_ARM_) && !defined(EP_NO_WIN32SPECIAL)
 
 // Headers
 #include <string>

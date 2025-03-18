@@ -177,7 +177,7 @@ void Player::Init(std::vector<std::string> args) {
 		c = '=';
 	Output::Debug("{}", header);
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 	WindowsUtils::InitMiniDumpWriter();
 #endif
 

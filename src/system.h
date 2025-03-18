@@ -41,7 +41,8 @@
 // Smart pointer header.
 #include "memory_management.h"
 
-#if defined(USE_LIBRETRO)
+#if defined(ES_SYSTEM_SUPPORT_EXTERNAL)
+#elif defined(USE_LIBRETRO)
 // libretro must be first to prevent conflicts with other defines
 #  define SUPPORT_JOYSTICK
 #  define SUPPORT_JOYSTICK_AXIS

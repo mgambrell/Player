@@ -22,8 +22,10 @@
 #include "system.h"
 #include <cstdint>
 #include <string>
-#ifdef _WIN32
+
+#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 #  include <windows.h>
+#elif defined(EP_OPENDIR_OPAQUE)
 #else
 #  ifdef __vita__
 #    include <psp2/io/dirent.h>
@@ -97,7 +99,7 @@ namespace Platform {
 		bool MakeDirectory(bool follow_symlinks) const;
 
 	private:
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 		const std::wstring filename;
 #else
 		const std::string filename;
@@ -140,13 +142,16 @@ namespace Platform {
 		explicit operator bool() const noexcept;
 
 	private:
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 		HANDLE dir_handle = nullptr;
 		WIN32_FIND_DATAW entry = {};
 		bool first_entry = true;
 #elif defined(__vita__)
 		int dir_handle = -1;
 		struct SceIoDirent entry = {};
+#elif defined(EP_OPENDIR_OPAQUE)
+		// this one is really hacky...
+		void* dir_handle, *entry_handle;
 #else
 		DIR* dir_handle = nullptr;
 		struct dirent* entry = nullptr;

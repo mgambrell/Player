@@ -18,6 +18,10 @@
 #ifndef EP_UTILS_H
 #define EP_UTILS_H
 
+#ifdef EP_PORTABILITY_PREFIX
+#include EP_PORTABILITY_PREFIX
+#endif
+
 #include <cstdint>
 #include <ctime>
 #include <functional>

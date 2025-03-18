@@ -259,6 +259,9 @@ public:
 	 */
 	Game_ConfigVideo GetConfig() const;
 
+	/** Implements GetGlobalConfigFilesystem() */
+	virtual std::string GetGlobalConfigFilesystem() { return ""; }
+
 protected:
 	/**
 	 * Protected Constructor. Use CreateUi instead.

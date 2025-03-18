@@ -28,7 +28,7 @@
 #include <lcf/inireader.h>
 #include <cstring>
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 #  include <shlobj.h>
 #endif
 
@@ -168,7 +168,7 @@ FilesystemView Game_Config::GetGlobalConfigFilesystem() {
 		}
 #elif defined(__ANDROID__)
 		// Never called, passed as argument on startup
-#elif defined(_WIN32)
+#elif defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 		PWSTR knownPath;
 		const auto hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &knownPath);
 		if (SUCCEEDED(hresult)) {
@@ -181,6 +181,8 @@ FilesystemView Game_Config::GetGlobalConfigFilesystem() {
 		if (!path.empty()) {
 			path = FileFinder::MakePath(path, FileFinder::MakePath(ORGANIZATION_NAME, APPLICATION_NAME));
 		}
+#elif defined(EP_GLOBAL_CONFIG_FILESYSTEM)
+		path = EP_GLOBAL_CONFIG_FILESYSTEM;
 #else
 		char* home = getenv("XDG_CONFIG_HOME");
 		if (home) {
@@ -291,7 +293,7 @@ Filesystem_Stream::OutputStream& Game_Config::GetLogFileOutput() {
 		std::string path;
 
 		if (logging.path.empty()) {
-	#if defined(_WIN32)
+	#if defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL)
 			PWSTR knownPath;
 			const auto hresult = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &knownPath);
 			if (SUCCEEDED(hresult)) {

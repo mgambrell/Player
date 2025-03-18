@@ -25,6 +25,8 @@
 #include "filesystem.h"
 #include "utils.h"
 #include "system.h"
+#include "PlayerCompat/off_t.h"
+#include "PlayerCompat/ssize_t.h"
 
 namespace Filesystem_Stream {
 	class InputStream final : public std::istream {

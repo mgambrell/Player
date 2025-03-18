@@ -214,7 +214,7 @@ void FileFinder_RTP::AddPath(StringView p) {
 }
 
 void FileFinder_RTP::ReadRegistry(StringView company, StringView product, StringView key) {
-#if defined(USE_WINE_REGISTRY) || defined(_WIN32)
+#if defined(USE_WINE_REGISTRY) || (defined(_WIN32) && !defined(EP_NO_WIN32SPECIAL))
 	std::string rtp_path = Registry::ReadStrValue(
 			HKEY_CURRENT_USER, "Software\\" + ToString(company) + "\\" + ToString(product), key, KEY32);
 	if (!rtp_path.empty()) {

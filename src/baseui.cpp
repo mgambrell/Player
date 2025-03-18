@@ -34,7 +34,10 @@
 #  include "platform/psvita/ui.h"
 #elif defined(__SWITCH__)
 #  include "platform/switch/ui.h"
+#elif defined EP_UI_HEADER
+#include EP_UI_HEADER
 #endif
+
 
 std::shared_ptr<BaseUi> DisplayUi;
 

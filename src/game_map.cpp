@@ -38,6 +38,7 @@
 #include "game_message.h"
 #include "game_screen.h"
 #include "game_pictures.h"
+#include "game_variables.h"
 #include "scene_battle.h"
 #include "scene_map.h"
 #include <lcf/lmu/reader.h>
@@ -240,10 +241,46 @@ void Game_Map::SetupFromSave(
 	}
 
 	if (is_map_save_compat) {
-		for (size_t i = 0; i < std::min(map->events.size(), map_info.events.size()); ++i) {
+		std::vector<int> destroyed_event_ids;
+
+		for (size_t i = 0, j = 0; i < events.size() && j < map_info.events.size(); ++i) {
 			auto& ev = events[i];
-			ev.SetSaveData(map_info.events[i]);
+			auto& save_ev = map_info.events[j];
+			if (ev.GetId() == save_ev.ID) {
+				ev.SetSaveData(save_ev);
+				++j;
+			} else {
+				if (save_ev.ID > ev.GetId()) {
+					// assume that the event has been destroyed during gameplay via "DestroyMapEvent"
+					destroyed_event_ids.emplace_back(ev.GetId());
+				} else {
+					Output::Debug("SetupFromSave: Unexpected ID {}/{}", save_ev.ID, ev.GetId());
+				}
+			}
 		}
+		for (size_t i = 0; i < destroyed_event_ids.size(); ++i) {
+			DestroyMapEvent(destroyed_event_ids[i], true);
+		}
+		if (destroyed_event_ids.size() > 0) {
+			UpdateUnderlyingEventReferences();
+		}
+	}
+
+	// Handle cloned events in a separate loop, regardless of "is_map_save_compat"
+	if (Player::HasEasyRpgExtensions()) {
+		for (size_t i = 0; i < map_info.events.size(); ++i) {
+			auto& save_ev = map_info.events[i];
+			bool is_cloned_evt = save_ev.easyrpg_clone_map_id > 0 || save_ev.easyrpg_clone_event_id > 0;
+			if (is_cloned_evt && CloneMapEvent(
+				save_ev.easyrpg_clone_map_id, save_ev.easyrpg_clone_event_id,
+				save_ev.position_x, save_ev.position_y,
+				save_ev.ID, "")) { // FIXME: Customized event names for saved events aren't part of liblcf/SaveMapEvent at the moment & thus cannot be restored
+				if (auto new_event = GetEvent(save_ev.ID); new_event != nullptr) {
+					new_event->SetSaveData(save_ev);
+				}
+			}
+		}
+		UpdateUnderlyingEventReferences();
 	}
 	map_info.events.clear();
 	interpreter->Clear();
@@ -399,7 +436,7 @@ void Game_Map::Caching::MapCache::Clear() {
 	}
 }
 
-bool Game_Map::CloneMapEvent(int src_map_id, int src_event_id, int target_x, int target_y, int target_event_id, StringView target_name) {
+bool Game_Map::CloneMapEvent(int src_map_id, int src_event_id, int target_x, int target_y, int target_event_id, std::string_view target_name) {
 	std::unique_ptr<lcf::rpg::Map> source_map_storage;
 	const lcf::rpg::Map* source_map;
 
@@ -446,18 +483,23 @@ bool Game_Map::CloneMapEvent(int src_map_id, int src_event_id, int target_x, int
 		}), new_event);
 
 	auto game_event = Game_Event(GetMapId(), &*insert_it);
+	game_event.data()->easyrpg_clone_event_id = src_event_id;
+	game_event.data()->easyrpg_clone_map_id = src_map_id;
+
 	events.insert(
 		std::upper_bound(events.begin(), events.end(), game_event, [](const auto& e, const auto& e2) {
 			return e.GetId() < e2.GetId();
-		}), Game_Event(GetMapId(), &*insert_it));
+		}), std::move(game_event));
 
 	UpdateUnderlyingEventReferences();
 
 	AddEventToCache(new_event);
 
 	Scene_Map* scene = (Scene_Map*)Scene::Find(Scene::Map).get();
-	scene->spriteset->Refresh();
-	SetNeedRefresh(true);
+	if (scene) {
+		scene->spriteset->Refresh();
+		SetNeedRefresh(true);
+	}
 
 	return true;
 }
@@ -756,7 +798,7 @@ bool Game_Map::CheckWay(const Game_Character& self,
 		)
 {
 	return CheckOrMakeWayEx(
-		self, from_x, from_y, to_x, to_y, true, nullptr, false
+		self, from_x, from_y, to_x, to_y, true, {}, false
 	);
 }
 
@@ -764,7 +806,7 @@ bool Game_Map::CheckWay(const Game_Character& self,
 		int from_x, int from_y,
 		int to_x, int to_y,
 		bool check_events_and_vehicles,
-		std::unordered_set<int> *ignore_some_events_by_id) {
+		Span<int> ignore_some_events_by_id) {
 	return CheckOrMakeWayEx(
 		self, from_x, from_y, to_x, to_y,
 		check_events_and_vehicles,
@@ -776,7 +818,7 @@ bool Game_Map::CheckOrMakeWayEx(const Game_Character& self,
 		int from_x, int from_y,
 		int to_x, int to_y,
 		bool check_events_and_vehicles,
-		std::unordered_set<int> *ignore_some_events_by_id,
+		Span<int> ignore_some_events_by_id,
 		bool make_way
 		)
 {
@@ -841,15 +883,22 @@ bool Game_Map::CheckOrMakeWayEx(const Game_Character& self,
 	}
 	if (vehicle_type != Game_Vehicle::Airship && check_events_and_vehicles) {
 		// Check for collision with events on the target tile.
-		for (auto& other: GetEvents()) {
-			if (ignore_some_events_by_id != NULL &&
-					ignore_some_events_by_id->find(other.GetId()) !=
-					ignore_some_events_by_id->end())
-				continue;
-			if (CheckOrMakeCollideEvent(other)) {
-				return false;
+		if (ignore_some_events_by_id.empty()) {
+			for (auto& other: GetEvents()) {
+				if (CheckOrMakeCollideEvent(other)) {
+					return false;
+				}
+			}
+		} else {
+			for (auto& other: GetEvents()) {
+				if (std::find(ignore_some_events_by_id.begin(), ignore_some_events_by_id.end(), other.GetId()) != ignore_some_events_by_id.end())
+					continue;
+				if (CheckOrMakeCollideEvent(other)) {
+					return false;
+				}
 			}
 		}
+
 		auto& player = Main_Data::game_player;
 		if (player->GetVehicleType() == Game_Vehicle::None) {
 			if (CheckOrMakeCollideEvent(*Main_Data::game_player)) {
@@ -887,7 +936,7 @@ bool Game_Map::MakeWay(const Game_Character& self,
 		)
 {
 	return CheckOrMakeWayEx(
-		self, from_x, from_y, to_x, to_y, true, NULL, true
+		self, from_x, from_y, to_x, to_y, true, {}, true
 		);
 }
 
@@ -1028,9 +1077,8 @@ bool Game_Map::IsPassableTile(
 				continue;
 			}
 			if (ev.IsInPosition(x, y) && ev.GetLayer() == lcf::rpg::EventPage::Layers_below) {
-				int tile_id = ev.GetTileId();
-				if (tile_id > 0) {
-					event_tile_id = tile_id;
+				if (ev.HasTileSprite()) {
+					event_tile_id = ev.GetTileId();
 				}
 			}
 		}
@@ -1384,7 +1432,7 @@ bool Game_Map::UpdateForegroundEvents(MapUpdateAsyncContext& actx) {
 			}
 		}
 		if (run_ce) {
-			interp.Push(run_ce);
+			interp.Push<InterpreterExecutionType::AutoStart>(run_ce);
 		}
 
 		Game_Event* run_ev = nullptr;
@@ -1399,7 +1447,25 @@ bool Game_Map::UpdateForegroundEvents(MapUpdateAsyncContext& actx) {
 			}
 		}
 		if (run_ev) {
-			interp.Push(run_ev);
+			if (run_ev->WasStartedByDecisionKey()) {
+				interp.Push<InterpreterExecutionType::Action>(run_ev);
+			} else {
+				switch (run_ev->GetTrigger()) {
+					case lcf::rpg::EventPage::Trigger_touched:
+						interp.Push<InterpreterExecutionType::Touch>(run_ev);
+						break;
+					case lcf::rpg::EventPage::Trigger_collision:
+						interp.Push<InterpreterExecutionType::Collision>(run_ev);
+						break;
+					case lcf::rpg::EventPage::Trigger_auto_start:
+						interp.Push<InterpreterExecutionType::AutoStart>(run_ev);
+						break;
+					case lcf::rpg::EventPage::Trigger_action:
+					default:
+						interp.Push<InterpreterExecutionType::Action>(run_ev);
+						break;
+				}
+			}
 			run_ev->ClearWaitingForegroundExecution();
 		}
 
@@ -1549,7 +1615,7 @@ static void OnEncounterEnd(BattleResult result) {
 	auto* ce = lcf::ReaderUtil::GetElement(common_events, Game_Battle::GetDeathHandlerCommonEvent());
 	if (ce) {
 		auto& interp = Game_Map::GetInterpreter();
-		interp.Push(ce);
+		interp.Push<InterpreterExecutionType::DeathHandler>(ce);
 	}
 
 	auto tt = Game_Battle::GetDeathHandlerTeleport();
@@ -1570,6 +1636,11 @@ bool Game_Map::PrepareEncounter(BattleArgs& args) {
 	}
 
 	args.troop_id = encounters[Rand::GetRandomNumber(0, encounters.size() - 1)];
+
+	if (RuntimePatches::EncounterRandomnessAlert::HandleEncounter(args.troop_id)) {
+		//Cancel the battle setup
+		return false;
+	}
 
 	if (Feature::HasRpg2kBattleSystem()) {
 		if (Rand::ChanceOf(1, 32)) {
@@ -1631,10 +1702,10 @@ int Game_Map::GetChipset() {
 	return chipset != nullptr ? chipset->ID : 0;
 }
 
-StringView Game_Map::GetChipsetName() {
+std::string_view Game_Map::GetChipsetName() {
 	return chipset != nullptr
-		? StringView(chipset->chipset_name)
-		: StringView("");
+		? std::string_view(chipset->chipset_name)
+		: std::string_view("");
 }
 
 int Game_Map::GetPositionX() {
@@ -1762,7 +1833,7 @@ std::vector<Game_CommonEvent>& Game_Map::GetCommonEvents() {
 	return common_events;
 }
 
-StringView Game_Map::GetMapName(int id) {
+std::string_view Game_Map::GetMapName(int id) {
 	for (unsigned int i = 0; i < lcf::Data::treemap.maps.size(); ++i) {
 		if (lcf::Data::treemap.maps[i].ID == id) {
 			return lcf::Data::treemap.maps[i].name;

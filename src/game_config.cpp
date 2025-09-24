@@ -49,9 +49,9 @@ namespace {
 
 #if USE_SDL == 1
 	// For SDL1 hardcode a different config file because it uses a completely different mapping for gamepads
-	StringView config_name = "config_sdl1.ini";
+	std::string_view config_name = "config_sdl1.ini";
 #else
-	StringView config_name = EASYRPG_CONFIG_NAME;
+	std::string_view config_name = EASYRPG_CONFIG_NAME;
 #endif
 }
 
@@ -63,6 +63,9 @@ void Game_ConfigPlayer::Hide() {
 	font2.SetOptionVisible(false);
 	font2_size.SetOptionVisible(false);
 #endif
+	if (automatic_screenshots.IsOptionVisible()) {
+		automatic_screenshots_interval.SetLocked(!automatic_screenshots.Get());
+	}
 }
 
 void Game_ConfigVideo::Hide() {
@@ -81,6 +84,7 @@ void Game_ConfigVideo::Hide() {
 	touch_ui.SetOptionVisible(false);
 	pause_when_focus_lost.SetOptionVisible(false);
 	game_resolution.SetOptionVisible(false);
+	screen_scale.SetOptionVisible(false);
 }
 
 void Game_ConfigAudio::Hide() {
@@ -521,7 +525,7 @@ void Game_Config::LoadFromArgs(CmdlineParser& cp) {
 		}
 		if (cp.ParseNext(arg, 1, "--sound-volume")) {
 			if (arg.ParseValue(0, li_value)) {
-				audio.music_volume.Set(li_value);
+				audio.sound_volume.Set(li_value);
 			}
 			continue;
 		}
@@ -597,6 +601,7 @@ void Game_Config::LoadFromStream(Filesystem_Stream::InputStream& is) {
 	video.touch_ui.FromIni(ini);
 	video.pause_when_focus_lost.FromIni(ini);
 	video.game_resolution.FromIni(ini);
+	video.screen_scale.FromIni(ini);
 
 	if (ini.HasValue("Video", "WindowX") && ini.HasValue("Video", "WindowY") && ini.HasValue("Video", "WindowWidth") && ini.HasValue("Video", "WindowHeight")) {
 		video.window_x.FromIni(ini);
@@ -675,6 +680,9 @@ void Game_Config::LoadFromStream(Filesystem_Stream::InputStream& is) {
 	player.font2_size.FromIni(ini);
 	player.log_enabled.FromIni(ini);
 	player.screenshot_scale.FromIni(ini);
+	player.screenshot_timestamp.FromIni(ini);
+	player.automatic_screenshots.FromIni(ini);
+	player.automatic_screenshots_interval.FromIni(ini);
 }
 
 void Game_Config::WriteToStream(Filesystem_Stream::OutputStream& os) const {
@@ -691,6 +699,7 @@ void Game_Config::WriteToStream(Filesystem_Stream::OutputStream& os) const {
 	video.touch_ui.ToIni(os);
 	video.pause_when_focus_lost.ToIni(os);
 	video.game_resolution.ToIni(os);
+	video.screen_scale.ToIni(os);
 
 	// only preserve when toggling between window and fullscreen is supported
 	if (video.fullscreen.IsOptionVisible()) {
@@ -762,6 +771,11 @@ void Game_Config::WriteToStream(Filesystem_Stream::OutputStream& os) const {
 	player.font1_size.ToIni(os);
 	player.font2.ToIni(os);
 	player.font2_size.ToIni(os);
+	player.log_enabled.ToIni(os);
+	player.screenshot_scale.ToIni(os);
+	player.screenshot_timestamp.ToIni(os);
+	player.automatic_screenshots.ToIni(os);
+	player.automatic_screenshots_interval.ToIni(os);
 
 	os << "\n";
 }

@@ -60,7 +60,7 @@ bool Window_GameList::Refresh(FilesystemView filesystem_base, bool show_dotdot) 
 		}
 #endif
 
-		if (StringView(dir.second.name).ends_with(".save")) {
+		if (EndsWith(dir.second.name, ".save")) {
 			continue;
 		}
 		if (dir.second.type == DirectoryTree::FileType::Regular) {
@@ -129,7 +129,7 @@ void Window_GameList::DrawItem(int index) {
 
 #ifndef USE_CUSTOM_FILEBUF
 	auto color = Font::ColorDefault;
-	if (ge.type == FileFinder::Unknown) {
+	if (ge.type == FileFinder::ProjectType::Unknown) {
 		color = Font::ColorHeal;
 	} else if (ge.type > FileFinder::ProjectType::Supported) {
 		color = Font::ColorKnockout;

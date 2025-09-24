@@ -16,24 +16,12 @@
  */
 
 #include "game_interpreter_shared.h"
-#include "game_actors.h"
-#include "game_enemyparty.h"
-#include "game_ineluki.h"
-#include "game_map.h"
-#include "game_party.h"
-#include "game_player.h"
+#include "game_strings.h"
 #include "game_switches.h"
-#include "game_system.h"
+#include "game_variables.h"
 #include "maniac_patch.h"
 #include "main_data.h"
-#include "output.h"
 #include "player.h"
-#include "rand.h"
-#include "util_macro.h"
-#include "utils.h"
-#include "audio.h"
-#include "baseui.h"
-#include <cmath>
 #include <cstdint>
 #include <lcf/rpg/savepartylocation.h>
 #include <lcf/reader_util.h>
@@ -158,7 +146,7 @@ int Game_Interpreter_Shared::ValueOrVariableBitfield(lcf::rpg::EventCommand cons
 	return com.parameters[val_idx];
 }
 
-StringView Game_Interpreter_Shared::CommandStringOrVariable(lcf::rpg::EventCommand const& com, int mode_idx, int val_idx) {
+std::string_view Game_Interpreter_Shared::CommandStringOrVariable(lcf::rpg::EventCommand const& com, int mode_idx, int val_idx) {
 	if (!Player::IsPatchManiac()) {
 		return com.string;
 	}
@@ -172,7 +160,7 @@ StringView Game_Interpreter_Shared::CommandStringOrVariable(lcf::rpg::EventComma
 	return com.string;
 }
 
-StringView Game_Interpreter_Shared::CommandStringOrVariableBitfield(lcf::rpg::EventCommand const& com, int mode_idx, int shift, int val_idx) {
+std::string_view Game_Interpreter_Shared::CommandStringOrVariableBitfield(lcf::rpg::EventCommand const& com, int mode_idx, int shift, int val_idx) {
 	if (!Player::IsPatchManiac()) {
 		return com.string;
 	}
@@ -237,6 +225,24 @@ lcf::rpg::MoveCommand Game_Interpreter_Shared::DecodeMove(lcf::DBArray<int32_t>:
 
 	return cmd;
 }
+
+#ifdef ENABLE_DYNAMIC_INTERPRETER_CONFIG
+
+std::optional<bool> Game_Interpreter_Shared::GetRuntimeFlag(lcf::rpg::SaveEventExecState const& state, StateRuntimeFlagRef const field_on, StateRuntimeFlagRef const field_off) {
+	return GetRuntimeFlag(state.easyrpg_runtime_flags, field_on, field_off);
+}
+
+std::optional<bool> Game_Interpreter_Shared::GetRuntimeFlag(lcf::rpg::SaveEventExecState::EasyRpgStateRuntime_Flags const& state_runtime_flags, StateRuntimeFlagRef const field_on, StateRuntimeFlagRef const field_off) {
+	if (state_runtime_flags.conf_override_active) {
+		if (state_runtime_flags.*field_on)
+			return true;
+		if (state_runtime_flags.*field_off)
+			return false;
+	}
+	return std::nullopt;
+}
+
+#endif
 
 //explicit declarations for target evaluation logic shared between ControlSwitches/ControlVariables/ControlStrings
 template bool Game_Interpreter_Shared::DecodeTargetEvaluationMode<true, false, false, false, false>(lcf::rpg::EventCommand const&, int&, int&, Game_BaseInterpreterContext const&);

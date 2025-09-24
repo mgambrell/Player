@@ -69,8 +69,9 @@ public:
 	void SetScalingMode(ConfigEnum::ScalingMode) override;
 	void ToggleStretch() override;
 	void ToggleVsync() override;
+	void SetScreenScale(int scale) override;
 	void vGetConfig(Game_ConfigVideo& cfg) const override;
-	bool OpenURL(StringView url) override;
+	bool OpenURL(std::string_view url) override;
 	Rect GetWindowMetrics() const override;
 	bool HandleErrorOutput(const std::string &message) override;
 

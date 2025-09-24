@@ -39,10 +39,10 @@
 #  include "platform/emscripten/interface.h"
 #endif
 
-class MenuItem final : public ConfigParam<StringView> {
+class MenuItem final : public ConfigParam<std::string_view> {
 public:
-	explicit MenuItem(StringView name, StringView description, StringView value) :
-		ConfigParam<StringView>(name, description, "", "", value) {
+	explicit MenuItem(std::string_view name, std::string_view description, std::string_view value) :
+		ConfigParam<std::string_view>(name, description, "", "", value) {
 	}
 };
 
@@ -284,6 +284,7 @@ void Window_Settings::RefreshVideo() {
 	AddOption(cfg.pause_when_focus_lost, [cfg]() mutable { DisplayUi->SetPauseWhenFocusLost(cfg.pause_when_focus_lost.Toggle()); });
 	AddOption(cfg.touch_ui, [](){ DisplayUi->ToggleTouchUi(); });
 	AddOption(cfg.game_resolution, [this]() { DisplayUi->SetGameResolution(static_cast<ConfigEnum::GameResolution>(GetCurrentOption().current_value)); });
+	AddOption(cfg.screen_scale, [this](){ DisplayUi->SetScreenScale(GetCurrentOption().current_value); });
 }
 
 void Window_Settings::RefreshAudio() {
@@ -367,8 +368,8 @@ void Window_Settings::RefreshAudioSoundfont() {
 
 	std::string sf_lower = Utils::LowerCase(Audio().GetFluidsynthSoundfont());
 	for (const auto& item: *list) {
-		if (item.second.type == DirectoryTree::FileType::Regular && (StringView(item.first).ends_with(".sf2") || StringView(item.first).ends_with(".soundfont"))) {
-			AddOption(MenuItem(item.second.name, "Use this custom soundfont", StringView(sf_lower).ends_with(item.first) ? "[x]" : ""), [this, fs, item]() {
+		if (item.second.type == DirectoryTree::FileType::Regular && (EndsWith(item.first, ".sf2") || EndsWith(item.first, ".soundfont"))) {
+			AddOption(MenuItem(item.second.name, "Use this custom soundfont", EndsWith(sf_lower, item.first) ? "[x]" : ""), [this, fs, item]() {
 				Audio().SetFluidsynthSoundfont(FileFinder::MakePath(fs.GetFullPath(), item.second.name));
 				Pop();
 			});
@@ -434,6 +435,23 @@ void Window_Settings::RefreshEngine() {
 
 	GetFrame().options.back().help2 = fmt::format("Screenshot size: {}x{}",
 		Player::screen_width * cfg.screenshot_scale.Get(), Player::screen_height * cfg.screenshot_scale.Get());
+
+	auto fmt_sample_name = [](bool is_auto_screenshot) {
+		auto name = Output::GetScreenshotName(is_auto_screenshot);
+		if (Player::player_config.screenshot_timestamp.Get()) {
+			return name + ".png";
+		}
+		return name + "_0.png";
+	};
+
+	AddOption(cfg.screenshot_timestamp, [this, &cfg]() { cfg.screenshot_timestamp.Toggle(); });
+	GetFrame().options.back().help2 = fmt::format("Sample name: {}", fmt_sample_name(false));
+
+	AddOption(cfg.automatic_screenshots, [&cfg]() { cfg.automatic_screenshots.Toggle(); });
+	if (Player::player_config.automatic_screenshots.Get()) {
+		GetFrame().options.back().help2 = fmt::format("Sample name: {}", fmt_sample_name(true));
+	}
+	AddOption(cfg.automatic_screenshots_interval, [this, &cfg]() { cfg.automatic_screenshots_interval.Set(GetCurrentOption().current_value); });
 }
 
 void Window_Settings::RefreshEngineFont(bool mincho) {
@@ -466,11 +484,11 @@ void Window_Settings::RefreshEngineFont(bool mincho) {
 	assert(list);
 	for (const auto& item: *list) {
 		bool is_font = std::any_of(FileFinder::FONTS_TYPES.begin(), FileFinder::FONTS_TYPES.end(), [&item](const auto& ext) {
-			return StringView(item.first).ends_with(ext);
+			return EndsWith(item.first, ext);
 		});
 
 		if (item.second.type == DirectoryTree::FileType::Regular && is_font) {
-			AddOption(MenuItem(item.second.name, "Use this font", StringView(font_lower).ends_with(item.first) ? "[x]" : ""), [=, &cfg, &setting]() mutable {
+			AddOption(MenuItem(item.second.name, "Use this font", EndsWith(font_lower, item.first) ? "[x]" : ""), [=, &cfg, &setting]() mutable {
 				if (Input::IsTriggered(Input::LEFT) || Input::IsRepeated(Input::LEFT)) {
 					if (font_size.Get() == font_size.GetMin()) {
 						font_size.Set(font_size.GetMax());
@@ -594,10 +612,14 @@ void Window_Settings::RefreshLicense() {
 #ifdef HAVE_NLOHMANN_JSON
 	AddOption(MenuItem("nlohmann_json", "Processing of JSON files", "MIT"), [](){});
 #endif
+#ifdef WANT_FONT_BAEKMUK
 	AddOption(MenuItem("Baekmuk", "Korean font family", "Baekmuk"), [](){});
+#endif
 	AddOption(MenuItem("Shinonome", "Japanese font family", "Public Domain"), [](){});
 	AddOption(MenuItem("ttyp0", "ttyp0 font family", "ttyp0"), [](){});
+#ifdef WANT_FONT_WQY
 	AddOption(MenuItem("WenQuanYi", "WenQuanYi font family (CJK)", "GPLv2+ with FE"), [](){});
+#endif
 #ifdef EMSCRIPTEN
 	AddOption(MenuItem("Teenyicons", "Tiny minimal 1px icons", "MIT"), [](){});
 #endif
@@ -611,8 +633,8 @@ void Window_Settings::RefreshInput() {
 	AddOption(cfg.gamepad_swap_ab_and_xy, [&cfg](){ cfg.gamepad_swap_ab_and_xy.Toggle(); Input::ResetTriggerKeys(); });
 	AddOption(cfg.gamepad_swap_analog, [&cfg](){ cfg.gamepad_swap_analog.Toggle(); Input::ResetTriggerKeys(); });
 	AddOption(cfg.gamepad_swap_dpad_with_buttons, [&cfg](){ cfg.gamepad_swap_dpad_with_buttons.Toggle(); Input::ResetTriggerKeys(); });
-	AddOption(cfg.speed_modifier_a, [this, &cfg](){ auto tmp = GetCurrentOption().current_value; Player::speed_modifier_a = tmp; cfg.speed_modifier_a.Set(tmp); });
-	AddOption(cfg.speed_modifier_b, [this, &cfg](){ auto tmp = GetCurrentOption().current_value; Player::speed_modifier_b = tmp; cfg.speed_modifier_b.Set(tmp); });
+	AddOption(cfg.speed_modifier_a, [this, &cfg](){ cfg.speed_modifier_a.Set(GetCurrentOption().current_value); });
+	AddOption(cfg.speed_modifier_b, [this, &cfg](){ cfg.speed_modifier_b.Set(GetCurrentOption().current_value); });
 }
 
 void Window_Settings::RefreshButtonCategory() {

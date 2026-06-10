@@ -497,6 +497,8 @@ add_library(${PROJECT_NAME} OBJECT
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Default PlayerCompat implementations; ports needing private ones -I their own dir ahead of this
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/generic)
 
 # Optimize floating point math functions into intrinsics and don't check or set errno (i.e. sqrt(-1))
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

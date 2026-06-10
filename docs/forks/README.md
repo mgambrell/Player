@@ -63,6 +63,9 @@ RPG2k games"/in-battle-Call-Event LDB hacks, and more.
 - [easyrpg-extensions.md](easyrpg-extensions.md) — EasyRPG's own command codes (2002–2058),
   `0xC8+` chunk IDs, the per-savegame `EasyRpg_SetInterpreterFlag` mechanism, the `--patch-*`
   CLI surface, `EasyRPG.ini [Patch]`, and how patch selection / auto-detection / override work.
+- [fork-selection-design.md](fork-selection-design.md) — design analysis: is EasyRPG's
+  fork/version selection adequate, is a command-ID remapper needed (no — forks don't collide),
+  and the minimal per-build capability-gating addition for Maniac Patch.
 
 ## Architecture notes for adding a fork (orientation)
 

@@ -123,3 +123,6 @@ eboot.bin
 *.pem
 *.keystore
 *.jks
+
+# Local out-of-tree build dir used for fork-support work
+build-merge-check/

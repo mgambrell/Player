@@ -666,8 +666,17 @@ Parameter skeleton:
 > | 3 | **Frame skip** — render every n-th frame (saved) | 0=none, 1=1/5, 2=1/3, 3=1/2 (mask LUT `{0,4,2,1}`, `mask & frameCtr` skips the render switch) | — | `FUN_00489c20:78` (`DAT_0056d1e0` = render frame counter) / 211010 `FUN_00488ac0:79`; LUT recomputed on save-load `FUN_00495f40:376` | both |
 > | 4 | **Message mouse-interaction gate** (polarity: 1=off *default*, 0=on) | 0/1 | — | mask `0xf0` vs `0x30`, `GetCursorPos` path, click bit `0x80`: `FUN_004ce000:57/351/408` / 211010 `FUN_004c70d0:55/391/448` | both |
 > | 5 | **Battle/non-map UI anchor** — 3×3 placement of the 320×240 UI in custom windows | 0=center,1=TL,2=BL,3=TR,4=BR,5=TC,6=BC,7=CL,8=CR | — | `FUN_004a8000:31`, `FUN_004cc250:66`, getter `FUN_004a7f90` / 211010 `FUN_004a6570`/`FUN_004a65d0` | both |
-> | 6 | **Hard picture-array rebuild** to clamp(value,1,1000) (distinct from op 2) | value | — | in-handler | both |
+> | 6 | **(contested)** RE traced a clamp(value,1,1000) array rebuild; PR #3487 + the TPC mnemonic `@sys.gameOpt.animLimit` say **battle-animation concurrency limit** | value/limit | — | in-handler | both |
 > | 7 | **FaceSet cell W×H** (default 48×48; persisted chunks `0x40`/`0x41`) | w | h | face grid `FUN_004cefd0:93-101`, face-X `FUN_004cc250:58`, indent `FUN_004ce000:253`, name-entry `FUN_004c2080:68` | **220325 only** |
+>
+> *Op-6 conflict:* the consumption-site RE read op 6 as a picture-array rebuild, but the official
+> TPC mnemonic (`@sys.gameOpt.animLimit`, changelog 2021-10-10 "戦闘アニメの同時表示数の上限変更を追加")
+> and PR #3487 both call it the **battle-animation concurrency limit**. The TPC/changelog
+> evidence is independent and specific, so treat **animLimit** as the likely-correct meaning and
+> the RE array-rebuild read as a probable misattribution (op 6 is unused by BR; low stakes,
+> flagged for a re-trace). *Op-1 fidelity:* the binary fast-forwards only while **right-Shift is
+> held AND bit 4 is set**; PR #3487 models bit 4 as an unconditional `SetFastForwardText(true)`,
+> slightly broader than the key-gated binary behavior.
 >
 > **Build delta:** 211010's switch has ops 0–6 (op 3 is the default-case target there; op ≥7
 > falls through to it); 220325 adds **op 7** (FaceSet cell size) and nothing else. This is part

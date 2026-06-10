@@ -35,7 +35,7 @@ v1.12a + Maniac Patch build 220325). See [`../games/beloved-rapture.md`](../game
 
 | Fork | Engine | Adds | Detection | EasyRPG | Spec |
 |---|---|---|---|---|---|
-| **Maniac Patch** (マニアクスパッチ) | RM2k3 v1.12a (Steam) | ~30 event commands (3001–3033), string variables, expression VM, global save, custom resolution, font loading, battle hooks | `accord.dll`; VERSIONINFO `Maniacs, vNNNNNN` | Deep (partial) | [maniac-patch.md](maniac-patch.md) · [commands](maniac-patch-commands.md) · [formats](maniac-patch-fileformats.md) |
+| **Maniac Patch** (マニアクスパッチ) | RM2k3 v1.12a (Steam) | ~30 event commands (3001–3033), string variables, expression VM, global save, custom resolution, font loading, battle hooks | `accord.dll`; VERSIONINFO `Maniacs, vNNNNNN` | Deep (partial) | [maniac-patch.md](maniac-patch.md) · [commands](maniac-patch-commands.md) · [formats](maniac-patch-fileformats.md) · [builds](maniac-patch-builds.md) |
 | **DynRPG** | RM2k3 v1.08 | Native C++ DLL plugin SDK; comment-command API; QuickPatches | `dynloader.dll` | HLE-only (2 plugins) | [dynrpg.md](dynrpg.md) |
 | **Destiny Patch** | RM2k 1.05/1.07 | `DestinyScript` in `$`-comment commands; `Destiny.dll` | `Destiny.dll` | Stub | [destiny.md](destiny.md) |
 | **PowerMode 2003** (Mega Patch 2003) | RM2k3 v1.09 | `V[1..8]` control registers; audio extensions | `warp.dll` | Detect + partial (master) | [powermode2003.md](powermode2003.md) |

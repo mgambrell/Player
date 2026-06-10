@@ -87,6 +87,13 @@ two **2022 dev builds are NOT published** — this is critical and RE-confirmed 
 deltas are condensed from the official 更新履歴 ("changelog"); the per-command "Since" column in
 [maniac-patch-commands.md](maniac-patch-commands.md) is authoritative for command introduction.
 
+> **Build identity & naming.** The `YYMMDD` code equals the binary's PE `TimeDateStamp` date, so
+> builds are named **`maniacs-PE<YYMMDD>-<lang>-<variant>`** (e.g. `maniacs-PE220325-en-im`) with a
+> `sha12` disambiguator. The naming convention, the fingerprint scheme, and the registry of every
+> build we hold (with hashes, timestamps, and witness games) live in
+> [maniac-patch-builds.md](maniac-patch-builds.md) (+ machine-readable
+> [`maniac-patch-builds.tsv`](maniac-patch-builds.tsv)).
+
 | Build | Date | Era | Headline changes | Published |
 |---|---|---|---|---|
 | 180809 | 2018-08-09 | old | 動作テスト版 — first operational test release | ✅ |

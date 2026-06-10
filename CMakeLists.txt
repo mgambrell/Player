@@ -12,7 +12,6 @@ include(PlayerConfigureWindows)
 include(PlayerFindPackage)
 include(PlayerBuildType)
 include(PlayerMisc)
-include(GetGitRevisionDescription)
 
 # Dependencies provided by CMake Presets
 option(PLAYER_FIND_ROOT_PATH_APPEND
@@ -141,6 +140,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/filesystem_stream.h
 	src/filesystem_zip.cpp
 	src/filesystem_zip.h
+	src/filesystem_tar.cpp
+	src/filesystem_tar.h
 	src/flash.h
 	src/flat_map.h
 	src/font.cpp
@@ -169,6 +170,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/game_config.h
 	src/game_config_game.cpp
 	src/game_config_game.h
+	src/game_constants.h
+	src/game_constants.cpp
 	src/game_destiny.cpp
 	src/game_destiny.h
 	src/game_dynrpg.cpp
@@ -513,53 +516,24 @@ set(PLAYER_VERSION_FULL ${PLAYER_VERSION})
 string(CONCAT PROJECT_VERSION
 	${PROJECT_VERSION_MAJOR} "." ${PROJECT_VERSION_MINOR} "."
 	${PROJECT_VERSION_PATCH} "." ${PROJECT_VERSION_TWEAK})
+set(PLAYER_VERSION_DEFS EP_VERSION="${PLAYER_VERSION}"
+	EP_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} EP_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+	EP_VERSION_PATCH=${PROJECT_VERSION_PATCH} EP_VERSION_TWEAK=${PROJECT_VERSION_TWEAK})
 
-set(PLAYER_VERSION_GIT "")
-git_get_exact_tag(GIT_TAG)
-# Do not include a hash, if we are building a release tag
-if(NOT GIT_TAG)
-	# otherwise concatenate a version with hash
-	git_describe(GIT_DESCRIPTION)
-	if(GIT_DESCRIPTION)
-		string(REPLACE "-" ";" GIT_DESCRIPTION ${GIT_DESCRIPTION})
-		list(LENGTH GIT_DESCRIPTION GIT_DESCRIPTION_PARTS)
-		set(GIT_MESSAGE "Found git info: ")
-		if(GIT_DESCRIPTION_PARTS EQUAL 3)
-			list(GET GIT_DESCRIPTION 0 GIT_TAG)
-			list(GET GIT_DESCRIPTION 1 GIT_COMMITS)
-			list(GET GIT_DESCRIPTION 2 GIT_HASH)
-			string(APPEND GIT_MESSAGE "${GIT_COMMITS} commits since tag \"${GIT_TAG}\", ")
-			string(PREPEND GIT_COMMITS "+")
-			# strip the g prefix
-			string(SUBSTRING ${GIT_HASH} 1 -1 GIT_HASH)
-		else()
-			# no tags found, only hash
-			list(GET GIT_DESCRIPTION 0 GIT_HASH)
-		endif()
-		set(PLAYER_VERSION_GIT "git${GIT_COMMITS}@${GIT_HASH}")
-		string(APPEND GIT_MESSAGE "object hash is ${GIT_HASH}")
-		git_local_changes(GIT_DIRTY)
-		if(GIT_DIRTY STREQUAL "DIRTY")
-			string(APPEND PLAYER_VERSION_GIT "-dirty")
-			string(APPEND GIT_MESSAGE ", you have uncommitted changes")
-		endif()
-		string(APPEND PLAYER_VERSION_FULL "-${PLAYER_VERSION_GIT}")
-
-		message(STATUS "${GIT_MESSAGE}")
-	endif()
+player_find_gitversion(VERSION_VAR PLAYER_VERSION_GIT
+	MESSAGE_VAR GIT_STATUS)
+if(PLAYER_VERSION_GIT)
+	string(APPEND PLAYER_VERSION_FULL "-${PLAYER_VERSION_GIT}")
+	list(APPEND PLAYER_VERSION_DEFS EP_VERSION_GIT="${PLAYER_VERSION_GIT}")
 endif()
 
 string(TIMESTAMP PLAYER_DATE "(%Y-%m-%d)")
 set(PLAYER_VERSION_APPEND ${PLAYER_DATE} CACHE STRING "Additional version information to include")
-set_property(SOURCE src/version.cpp PROPERTY COMPILE_DEFINITIONS
-	EP_VERSION="${PLAYER_VERSION}";
-	EP_VERSION_MAJOR=${PROJECT_VERSION_MAJOR};
-	EP_VERSION_MINOR=${PROJECT_VERSION_MINOR};
-	EP_VERSION_PATCH=${PROJECT_VERSION_PATCH};
-	EP_VERSION_TWEAK=${PROJECT_VERSION_TWEAK};
-	EP_VERSION_APPEND="${PLAYER_VERSION_APPEND}";
-	EP_VERSION_GIT="${PLAYER_VERSION_GIT}"
-)
+if(NOT PLAYER_VERSION_APPEND STREQUAL "")
+	list(APPEND PLAYER_VERSION_DEFS EP_VERSION_APPEND="${PLAYER_VERSION_APPEND}")
+endif()
+
+set_property(SOURCE src/version.cpp PROPERTY COMPILE_DEFINITIONS ${PLAYER_VERSION_DEFS})
 
 # Platform setup
 if(NINTENDO_3DS)
@@ -575,8 +549,10 @@ elseif(NINTENDO_WIIU)
 	set(PLAYER_TARGET_PLATFORM "SDL2" CACHE STRING "Platform to compile for.")
 elseif(AMIGA)
 	set(PLAYER_TARGET_PLATFORM "SDL1" CACHE STRING "Platform to compile for.")
+elseif(PS4)
+	set(PLAYER_TARGET_PLATFORM "SDL2" CACHE STRING "Platform to compile for.")
 else()
-	set(PLAYER_TARGET_PLATFORM "SDL2" CACHE STRING "Platform to compile for. Options: SDL3 SDL2 SDL1 libretro")
+	set(PLAYER_TARGET_PLATFORM "SDL3" CACHE STRING "Platform to compile for. Options: SDL3 SDL2 SDL1 libretro")
 	set_property(CACHE PLAYER_TARGET_PLATFORM PROPERTY STRINGS SDL3 SDL2 SDL1 libretro)
 endif()
 set(PLAYER_BUILD_EXECUTABLE ON)
@@ -602,11 +578,16 @@ if(PLAYER_TARGET_PLATFORM STREQUAL "SDL3")
 	target_compile_definitions(${PROJECT_NAME} PUBLIC USE_SDL=3)
 
 	player_find_package(NAME SDL3
+		VERSION 3.4.0
 		TARGET SDL3::SDL3
 		REQUIRED)
 
 	if(ANDROID)
 		set(PLAYER_BUILD_EXECUTABLE OFF)
+	endif()
+
+	if(WIN32)
+		target_link_libraries(${PROJECT_NAME} "Dwmapi")
 	endif()
 elseif(PLAYER_TARGET_PLATFORM STREQUAL "SDL2")
 	target_sources(${PROJECT_NAME} PRIVATE
@@ -788,7 +769,7 @@ if(NOT PLAYER_AUDIO_BACKEND IN_LIST AUDIO_PROP)
 endif()
 
 # Shared by homebrew platforms
-if(NINTENDO_3DS OR NINTENDO_WII OR NINTENDO_WIIU OR NINTENDO_WIIU OR NINTENDO_SWITCH OR VITA)
+if(NINTENDO_3DS OR NINTENDO_WII OR NINTENDO_WIIU OR NINTENDO_WIIU OR NINTENDO_SWITCH OR VITA OR PS4)
 	target_compile_options(${PROJECT_NAME} PUBLIC -fno-exceptions -fno-rtti)
 	if(VITA)
 		# This optimisation is unstable on Vita (crashes at the end of MainLoop)
@@ -1264,9 +1245,9 @@ if(PLAYER_BUILD_EXECUTABLE AND ${PLAYER_TARGET_PLATFORM} MATCHES "^SDL.*$" AND N
 
 		set_property(TARGET ${EXE_NAME} PROPERTY LINK_FLAGS
 			"-sALLOW_MEMORY_GROWTH -sMINIFY_HTML=0 -sMODULARIZE -sEXPORT_NAME=createEasyRpgPlayer \
-			 -sEXIT_RUNTIME --bind --pre-js ${PLAYER_JS_PREJS} --post-js ${PLAYER_JS_POSTJS} \
+			 -sEXIT_RUNTIME=0 --bind --pre-js ${PLAYER_JS_PREJS} --post-js ${PLAYER_JS_POSTJS} \
 			 -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=['$autoResumeAudioContext','$dynCall'] \
-			 -sEXPORTED_RUNTIME_METHODS=['FS'] \
+			 -sEXPORTED_RUNTIME_METHODS=['FS','HEAPU8'] \
 			 -sEXPORTED_FUNCTIONS=_main,_malloc,_free")
 		set_source_files_properties("src/platform/sdl/main.cpp" PROPERTIES
 			OBJECT_DEPENDS "${PLAYER_JS_PREJS};${PLAYER_JS_POSTJS};${PLAYER_JS_SHELL}")
@@ -1422,6 +1403,25 @@ elseif(PLAYER_CONSOLE_PORT AND NOT PLAYER_TARGET_PLATFORM STREQUAL "libretro")
 			FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/psvita/touch_ui.png" touch_ui.png)
 		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EasyRPG-Player.vpk
 			DESTINATION . COMPONENT psvita)
+	elseif(PS4)
+
+		add_executable(easyrpg-player "src/platform/ps4/main.cpp")
+		target_link_libraries(easyrpg-player ${PROJECT_NAME}
+			bz2 SceSysmodule ScePigletv2VSH SceUserService SceAudioOut SceSystemService ScePad)
+
+		configure_file(${OPENORBIS}/samples/piglet/sce_module/libc.prx
+			${CMAKE_CURRENT_SOURCE_DIR}/resources/ps4/sce_module/libc.prx COPYONLY)
+		configure_file(
+			${OPENORBIS}/samples/piglet/sce_module/libSceFios2.prx
+			${CMAKE_CURRENT_SOURCE_DIR}/resources/ps4/sce_module/libSceFios2.prx COPYONLY)
+		configure_file(
+			${OPENORBIS}/samples/piglet/sce_sys/about/right.sprx
+			${CMAKE_CURRENT_SOURCE_DIR}/resources/ps4/sce_sys/about/right.sprx COPYONLY)
+
+
+		add_self(easyrpg-player)
+		add_pkg(easyrpg-player ${CMAKE_SOURCE_DIR}/resources/ps4
+			"ERPG00001" "easyRPG" "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 	endif()
 	install(TARGETS easyrpg-player RUNTIME DESTINATION . COMPONENT debug)
 	# debug information
@@ -1532,14 +1532,7 @@ find_package(Doxygen)
 set(DOXYGEN_STATUS "Unavailable")
 if(DOXYGEN_FOUND)
 	set(DOXYGEN_STATUS "Available (target \"doc\")")
-	# fake autotools variables
-	set(PACKAGE_VERSION ${PLAYER_VERSION})
-	set(DX_DOCDIR ${CMAKE_CURRENT_BINARY_DIR}/doc)
-	set(srcdir ${CMAKE_CURRENT_SOURCE_DIR})
 	configure_file(resources/Doxyfile.in resources/Doxyfile @ONLY)
-	unset(PACKAGE_VERSION)
-	unset(DX_DOCDIR)
-	unset(srcdir)
 
 	add_custom_target(player_doc
 		${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/resources/Doxyfile
@@ -1616,6 +1609,9 @@ endif()
 
 # Print summary
 message(STATUS "")
+message(STATUS "EasyRPG Player version ${PLAYER_VERSION} has been configured --")
+message(STATUS "Git info: ${GIT_STATUS}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 set(TARGET_STATUS "${PLAYER_TARGET_PLATFORM}")
 if(NINTENDO_WIIU)
 	set(TARGET_STATUS "Wii U (SDL2)")
